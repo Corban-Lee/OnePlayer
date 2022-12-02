@@ -445,12 +445,6 @@ class MusicCog(BaseCog, name="New Music"):
     __slots__ = ()
     voice_states = {}
 
-    group = app_commands.Group(
-        name="music",
-        description="Music commands",
-        guild_only=True
-    )
-
     async def cog_unload(self) -> None:
         """Cleanup when cog is unloaded"""
 
@@ -515,7 +509,7 @@ class MusicCog(BaseCog, name="New Music"):
 
         voice_state.voice: VoiceClient = await voice_channel.connect()
 
-    @group.command(name="join")
+    @app_commands.command(name="join")
     @app_commands.check(check_member_in_vc)
     async def join_vc_cmd(self, inter:Inter):
         """Joins the current voice channel"""
@@ -523,7 +517,7 @@ class MusicCog(BaseCog, name="New Music"):
         await self.join_vc(inter)
         await inter.response.send_message(MUSIC_JOINEDVC)
 
-    @group.command(name="leave")
+    @app_commands.command(name="leave")
     @app_commands.default_permissions(move_members=True)
     @app_commands.check(check_member_in_vc)
     async def leave_vc_cmd(self, inter:Inter):
@@ -539,7 +533,7 @@ class MusicCog(BaseCog, name="New Music"):
     
         await inter.response.send_message(MUSIC_LEFTVC)
 
-    @group.command(name="currently-playing")
+    @app_commands.command(name="currently-playing")
     @app_commands.check(check_member_in_vc)
     async def currently_playing_cmd(self, inter:Inter):
         """Shows the currently playing song"""
@@ -556,7 +550,7 @@ class MusicCog(BaseCog, name="New Music"):
             # view=MusicControlView(voice_state)
         )
 
-    @group.command(name="queue")
+    @app_commands.command(name="queue")
     @app_commands.check(check_member_in_vc)
     async def queue_cmd(self, inter:Inter, page:int=1):
         """Shows the music player's queue. There are 10 tracks shown
@@ -603,7 +597,7 @@ class MusicCog(BaseCog, name="New Music"):
         )
         await inter.response.send_message(embed=embed)
 
-    @group.command(name="skip")
+    @app_commands.command(name="skip")
     @app_commands.check(check_member_in_vc)
     async def skip_cmd(self, inter:Inter):
         """Skips the currently playing song. Requires 3 votes unless
@@ -656,7 +650,7 @@ class MusicCog(BaseCog, name="New Music"):
                 MUSIC_ALREADYVOTEDTOSKIP
             )
 
-    @group.command(name="pause")
+    @app_commands.command(name="pause")
     @app_commands.check(check_member_in_vc)
     async def pause_cmd(self, inter:Inter):
         """Pauses the currently playing song"""
@@ -671,7 +665,7 @@ class MusicCog(BaseCog, name="New Music"):
         voice_state.voice.pause()
         await inter.response.send_message(MUSIC_PAUSED)
 
-    @group.command(name="resume")
+    @app_commands.command(name="resume")
     @app_commands.check(check_member_in_vc)
     async def resume_cmd(self, inter:Inter):
         """Resumes the currently playing song"""
@@ -686,7 +680,7 @@ class MusicCog(BaseCog, name="New Music"):
         voice_state.voice.resume()
         await inter.response.send_message(MUSIC_RESUMED)
 
-    @group.command(name="stop")
+    @app_commands.command(name="stop")
     @app_commands.check(check_member_in_vc)
     @app_commands.default_permissions(move_members=True)
     async def stop_cmd(self, inter:Inter):
@@ -704,7 +698,7 @@ class MusicCog(BaseCog, name="New Music"):
 
 
 
-    @group.command(name="loop")
+    @app_commands.command(name="loop")
     @app_commands.check(check_member_in_vc)
     async def loop_cmd(self, inter:Inter, loop:bool):
         """Loops the currently playing song
@@ -726,7 +720,7 @@ class MusicCog(BaseCog, name="New Music"):
             MUSIC_LOOPING if loop else MUSIC_NOTLOOPING
         )
 
-    @group.command(name="play")
+    @app_commands.command(name="play")
     @app_commands.check(check_member_in_vc)
     async def play_audio_cmd(self, inter:Inter, search:str):
         """Plays audio from a search query or URL, I will join the
@@ -799,7 +793,7 @@ class MusicCog(BaseCog, name="New Music"):
 
         await inter.followup.send(MUSIC_ADDEDPLAYSOON)
 
-    @group.command(name="rickroll")
+    @app_commands.command(name="rickroll")
     @app_commands.check(check_member_in_vc)
     async def rickroll(self, inter:Inter):
         """Does Nothing"""
@@ -807,21 +801,21 @@ class MusicCog(BaseCog, name="New Music"):
         await self.music_playback(inter, search="https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 
 
-    @group.command(name="iamabadperson")
+    @app_commands.command(name="iamabadperson")
     @app_commands.check(check_member_in_vc)
     async def iamabadperson(self, inter:Inter):
         """You are a bad person"""
 
         await self.music_playback(inter, search="https://www.youtube.com/watch?v=aAkMkVFwAoo")
 
-    @group.command(name="2010youtube")
+    @app_commands.command(name="2010youtube")
     @app_commands.check(check_member_in_vc)
     async def old_youtube(self, inter:Inter):
         """Experience Nostalgia"""
 
         await self.music_playback(inter, search="https://www.youtube.com/watch?v=Cm0qaXi9THA")
     
-    @group.command(name="deadmeme")
+    @app_commands.command(name="deadmeme")
     @app_commands.check(check_member_in_vc)
     async def deadmeme(self, inter:Inter):
         """How was this funny"""
