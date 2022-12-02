@@ -1,20 +1,9 @@
 """This file contains all the constants used in the bot."""
 
-from easy_pil import Font
-
-
 # Bot constants
 ACTIVITY_MSG = 'I am up and running!'
 DATE_FORMAT = '%d/%m/%Y'
 DATETIME_FORMAT = "%d/%m/%Y %H:%M:%S"
-
-# PronounDB constants
-PRONOUNDB_GET_URL = "https://pronoundb.org/api/v1/lookup"
-PRONOUNDB_LOGIN_URL = "https://pronoundb.org/login/"
-PRONOUNDB_SET_URL = "https://pronoundb.org/me"
-
-# Command constants
-BDAY_HELP_MSG = 'Use `/birthday help` for more info'
 
 # MSGS
 BAD_TOKEN = 'You have passed an improper or invalid token! Shutting down...'
@@ -26,22 +15,9 @@ LOGS = 'logs/'
 LOG_FILENAME_FORMAT_PREFIX = '%Y-%m-%d %H-%M-%S'
 MAX_LOGFILE_AGE_DAYS = 7
 
-# Levelcard constants
-BLACK = "#0F0F0F"
-WHITE = "#F9F9F9"
-DARK_GREY = "#2F2F2F"
-LIGHT_GREY = "#9F9F9F"
-POPPINS = Font.poppins(size=70)
-POPPINS_SMALL = Font.poppins(size=50)
-
 # Messages/Words
 ACTIVITY = "/help"
 INVALID_PAGE_NUMBER = "Invalid page number! There are {} pages."
-NO_TICKETS_ERR = (
-    "This server does not have tickets enabled."
-    "\nThey can be enabled by purposing a category for "
-    "tickets if you have the manage channels permission."
-)
 
 MUSIC_CANTLEAVEVC = (
     "I can't leave the voice channel if I'm not in one!"
@@ -84,13 +60,3 @@ MUSIC_ADDEDPLAYSOON = (
     "I've added the song to the queue!"
     "\nIt will play in a moment."
 )
-
-# Entertainment constants
-
-ROCK = "rock"
-PAPER = "paper"
-SCISSORS = "scissors"
-RPS_CHOICES = (ROCK, PAPER, SCISSORS)
-RPS_WINNER = "You win!"
-RPS_LOSER = "You Lose, I win!"
-RPS_DRAW = "Draw, we both chose the same thing..."
