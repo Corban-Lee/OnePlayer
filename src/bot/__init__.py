@@ -13,7 +13,6 @@ from discord.ext import commands, tasks
 from db import db
 from db.enums import ChannelPurposes
 from ui import ManageTicketView
-from ._get import Get
 from ._logs import setup_logs
 
 
@@ -26,7 +25,6 @@ class Bot(commands.Bot):
     __slots__ = (
         "_start_time",
         "log_filepath",
-        "get",
         "cog_events",
         "all_cogs_loaded",
         "commands_synced",
@@ -46,7 +44,6 @@ class Bot(commands.Bot):
             intents=discord.Intents.all()
         )
 
-        self.get: Get = Get(self)
         self.log_filepath = setup_logs()
         self.commands_synced = False
 
