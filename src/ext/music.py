@@ -7,6 +7,8 @@ import itertools
 import random
 import math
 from async_timeout import timeout
+from enum import Enum, auto
+from abc import ABC, abstractmethod
 
 import discord
 from discord import (
@@ -51,74 +53,53 @@ youtube_dl.utils.bug_reports_message = lambda: ''
 log = logging.getLogger(__name__)
 
 
-class YTDLSource(discord.PCMVolumeTransformer):
-    """A source for playing from YouTube"""
+class Sources(Enum):
+    Youtube = auto()  # not following name convensions here because the
+    Spotify = auto()  # variable names are show on the user interface
 
-    __slots__ = (
-        "guild_id",
-        "requester",
-        "channel",
-        "data",
-        "uploader",
-        "uploader_url",
-        "upload_date",
-        "title",
-        "thumbnail",
-        "description",
-        "duration",
-        "tags",
-        "url",
-        "views",
-        "likes",
-        "dislikes",
-        "stream_url"
-    )
 
-    YTDL_OPTIONS = {
-        'format': 'bestaudio/best',
-        'extractaudio': True,
-        'audioformat': 'mp3',
-        'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-        'restrictfilenames': True,
-        'noplaylist': True,
-        'nocheckcertificate': True,
-        'ignoreerrors': False,
-        'logtostderr': False,
-        'quiet': True,
-        'no_warnings': True,
-        'default_search': 'auto',
-        'source_address': '0.0.0.0',
-    }
+class Source(ABC):
+    """Represents a source for audio content"""
 
-    FFMPEG_OPTIONS = {
-        'options': '-vn',
-        'before_options': '-reconnect 1 -reconnect_streamed 1 '
-                          '-reconnect_delay_max 5'
-    }
+    requester: discord.User
+    channel: discord.TextChannel
+    data: dict
 
+    uploader: str
+    uploader_url: str
+    upload_date: str
+    thumbnail: str
+    title: str
+    description: str
+
+    @classmethod
+    @abstractmethod
+    async def from_query(cls, *args, **kwargs):
+        pass
+
+
+class YTDLSource(Source, discord.PCMVolumeTransformer):
+    """Represents a youtube source for audio content"""
+
+    __slots__ = ()
+
+    YTDL_OPTIONS = {"default_search": "auto"}
+    FFMPEG_OPTIONS = {"options": "-vn"}
     ytdl = youtube_dl.YoutubeDL(YTDL_OPTIONS)
 
-    def __init__(
-        self,
-        inter,
-        source: discord.FFmpegPCMAudio,
-        *,
-        data: dict,
-        volume: float = 0.5
-    ):
-        super().__init__(source, volume)
+    def __init__(self, inter: Inter, ffmpeg_source: discord.FFmpegPCMAudio, *, data: dict, volume:float=0.5):
+        super().__init__(ffmpeg_source, volume)
 
-        log.debug('Creating YTDLSource instance')
-
-        self.guild_id = inter.guild_id
-        self.requester = inter.user
-        self.channel = inter.channel
+        self.requester: discord.User = inter.user
+        self.channel: discord.TextChannel = inter.channel
         self.data = data
 
+        log.debug(data)
+
+        # shorthands for audio data
         self.uploader = data.get('uploader')
         self.uploader_url = data.get('uploader_url')
-        date = data.get('upload_date')
-        self.upload_date = date[6:8] + '.' + date[4:6] + '.' + date[0:4]
+        self.upload_date = data.get('upload_date')
         self.title = data.get('title')
         self.thumbnail = data.get('thumbnail')
         self.description = data.get('description')
@@ -130,113 +111,30 @@ class YTDLSource(discord.PCMVolumeTransformer):
         self.dislikes = data.get('dislike_count')
         self.stream_url = data.get('url')
 
-    def __str__(self):
-        return f'**{self.title}** by **{self.uploader}**'
 
     @classmethod
-    async def create_source(
-        cls,
-        inter:Inter,
-        search: str,
-        *,
-        loop: asyncio.BaseEventLoop=None,
-    ):
-        """Creates a source from a search query or URL"""
+    async def from_query(cls, inter:Inter, query:str, async_loop:asyncio.BaseEventLoop):
+        """Create a youtube source from a search query"""
 
-        log.debug("Creating source for %s", search)
+        log.debug("from youtube query")
 
-        loop = loop or asyncio.get_event_loop()
+        data = await async_loop.run_in_executor(None, lambda: cls.ytdl.extract_info(query, download=False))
 
-        partial = functools.partial(
-            cls.ytdl.extract_info,
-            search,
-            download=False,
-            process=False
-        )
-        data = await loop.run_in_executor(None, partial)
+        if "entries" in data:
+            data = data["entries"][0]
 
-        if data is None:
-            raise YTDLError(
-                f"Couldn't find anything that matches `{search}`"
-            )
-
-        if 'entries' not in data:
-            process_info = data
-        else:
-
-            for entry in data['entries']:
-                if entry:
-                    process_info = entry
-                    break
-            else:
-                raise YTDLError(
-                    f"Couldn't find anything that matches `{search}`"
-                )
-        
-        log.debug("Processing info for %s", search)
-
-        webpage_url = process_info['webpage_url']
-        partial = functools.partial(
-            cls.ytdl.extract_info,
-            webpage_url,
-            download=False
-        )
-        processed_info = await loop.run_in_executor(None, partial)
-
-        if processed_info is None:
-            raise YTDLError(
-                f"Couldn't fetch `{webpage_url}`"
-            )
-
-        if 'entries' not in processed_info:
-            info = processed_info
-        else:
-            info = None
-            while info is None:
-                try:
-                    info = processed_info['entries'].pop(0)
-                except IndexError as err:
-                    raise YTDLError(
-                        "Couldn't retrieve any matches for "
-                        f"`{webpage_url}`"
-                    ) from err
-
-        log.debug("Creating FFmpeg source for %s", search)
-
-        return cls(
-            inter,
-            discord.FFmpegPCMAudio(
-                info['url'],
-                **cls.FFMPEG_OPTIONS
-            ),
-            data=info
-        )
+        filename = cls.ytdl.prepare_filename(data)
+        return cls(inter, discord.FFmpegPCMAudio(filename, **cls.FFMPEG_OPTIONS, executable="bin/ffmpeg.exe"), data=data)
 
 
-    @property
-    def parsed_duration(self) -> str:
-        """Parses the duration of a song"""
+class SpotifySource(Source, discord.PCMVolumeTransformer):
+    """Represents a spotiy source for audio content"""
 
-        duration = self.duration
+    @classmethod
+    async def from_query(cls, inter:Inter, search:str, async_loop:asyncio.BaseEventLoop):
+        """Create a spotify source from a search query"""
+        pass
 
-        log.debug("Parsing duration for %s", duration)
-
-        if duration == 0:
-            return 'Live Stream'
-
-        minutes, seconds = divmod(duration, 60)
-        hours, minutes = divmod(minutes, 60)
-        days, hours = divmod(hours, 24)
-
-        duration_list = []
-        for i, name in zip(
-            (days, hours, minutes, seconds),
-            ('days', 'hours', 'minutes', 'seconds')
-        ):
-            if i > 0:
-                duration_list.append(f'{i} {name}')
-
-        return ', '.join(duration_list)
 
 class Song:
     """A class to represent a song"""
@@ -249,6 +147,7 @@ class Song:
 
         self.source = source
         self.requester = source.requester
+
 
 class SongQueue(asyncio.Queue):
     """Queue that holds songs"""
@@ -298,7 +197,8 @@ class SongQueue(asyncio.Queue):
 
         del self._queue[index]
 
-class VoiceControls:
+
+class VoiceState:
     """A class to control the voice client, a new instance is created
     for each guild where the bot is present in a voice channel"""
 
@@ -317,12 +217,12 @@ class VoiceControls:
 
     def __init__(self, bot, inter:Inter):
 
-        log.debug("Creating VoiceControls instance")
+        log.debug("Creating VoiceState instance")
 
         self.bot = bot
         self.inter = inter
 
-        self.current = None
+        self.current: Song = None
         self.voice: VoiceClient = None
         self.next = asyncio.Event()
         self.queue = SongQueue()
@@ -457,7 +357,7 @@ class MusicCog(BaseCog, name="New Music"):
         try:
             return self.voice_states[inter.guild.id]
         except KeyError:
-            state = VoiceControls(self.bot, inter)
+            state = VoiceState(self.bot, inter)
             self.voice_states[inter.guild.id] = state
             return state
 
@@ -720,9 +620,7 @@ class MusicCog(BaseCog, name="New Music"):
             MUSIC_LOOPING if loop else MUSIC_NOTLOOPING
         )
 
-    @app_commands.command(name="play")
-    @app_commands.check(check_member_in_vc)
-    async def play_audio_cmd(self, inter:Inter, search:str):
+    async def youtube_playback(self, inter:Inter, search:str):
         """Plays audio from a search query or URL, I will join the
            join the vc if the I'm not already in one.
 
@@ -740,8 +638,8 @@ class MusicCog(BaseCog, name="New Music"):
         await inter.response.defer()
 
         # Create a source from the search query
-        source = await YTDLSource.create_source(
-            inter, search, loop=self.bot.loop
+        source = await YTDLSource.from_query(
+            inter, search, async_loop=self.bot.loop
         )
 
         # Add the source to the queue as a Song
@@ -761,7 +659,14 @@ class MusicCog(BaseCog, name="New Music"):
 
         await inter.followup.send(MUSIC_ADDEDPLAYSOON)
 
-    async def music_playback(self, inter, search):
+    async def spotify_playback(self, inter:Inter, search:str):
+        """Plays audio from a search query or URL, I will join the
+           join the vc if the I'm not already in one.
+
+        Args:
+            search (str): The search query or URL to use
+        """
+
         voice_state = self.get_voice_state(inter)
 
         # Join the voice channel if the bot is not already in one
@@ -772,7 +677,7 @@ class MusicCog(BaseCog, name="New Music"):
         await inter.response.defer()
 
         # Create a source from the search query
-        source = await YTDLSource.create_source(
+        source = await SpotifySource.create_source(
             inter, search, loop=self.bot.loop
         )
 
@@ -793,34 +698,55 @@ class MusicCog(BaseCog, name="New Music"):
 
         await inter.followup.send(MUSIC_ADDEDPLAYSOON)
 
-    @app_commands.command(name="rickroll")
+
+
+
+    @app_commands.command(name="play")
+    @app_commands.check(check_member_in_vc)
+    async def play_audio_cmd(self, inter:Inter, source:Sources, search:str):
+        """Plays audio from a search query or URL, I will join the
+           join the vc if the I'm not already in one.
+
+        Args:
+            search (str): The search query or URL to use
+        """
+
+        await self.youtube_playback(inter, search)
+
+    shortcut_group = app_commands.Group(
+        name="youtube-shortcuts",
+        description="Shortcuts for playback of certain youtube videos",
+        guild_only=True
+    )
+
+    @shortcut_group.command(name="rickroll")
     @app_commands.check(check_member_in_vc)
     async def rickroll(self, inter:Inter):
-        """Does Nothing"""
+        """Plays Rick Astley's "Never Gonna Give You Up" in the current"""
 
-        await self.music_playback(inter, search="https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        await self.youtube_playback(inter, search="https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 
 
-    @app_commands.command(name="iamabadperson")
+    @shortcut_group.command(name="iamabadperson")
     @app_commands.check(check_member_in_vc)
     async def iamabadperson(self, inter:Inter):
-        """You are a bad person"""
+        """Plays that one very annoying christmas song in the current"""
 
-        await self.music_playback(inter, search="https://www.youtube.com/watch?v=aAkMkVFwAoo")
+        await self.youtube_playback(inter, search="https://www.youtube.com/watch?v=aAkMkVFwAoo")
 
-    @app_commands.command(name="2010youtube")
+    @shortcut_group.command(name="2010youtube")
     @app_commands.check(check_member_in_vc)
     async def old_youtube(self, inter:Inter):
-        """Experience Nostalgia"""
+        """Plays a nostalgic track in the current voice channel"""
 
-        await self.music_playback(inter, search="https://www.youtube.com/watch?v=Cm0qaXi9THA")
+        await self.youtube_playback(inter, search="https://www.youtube.com/watch?v=Cm0qaXi9THA")
     
-    @app_commands.command(name="deadmeme")
+    @shortcut_group.command(name="deadmeme")
     @app_commands.check(check_member_in_vc)
     async def deadmeme(self, inter:Inter):
-        """How was this funny"""
+        """Plays a dead meme in the current voice channel"""
 
-        await self.music_playback(inter, search="https://www.youtube.com/watch?v=LBnUc09MK2w")
+        await self.youtube_playback(inter, search="https://www.youtube.com/watch?v=LBnUc09MK2w")
 
     
 
