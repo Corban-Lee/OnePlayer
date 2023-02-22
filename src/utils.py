@@ -1,25 +1,11 @@
-"""Utils for the bot."""
 
-import logging
+from discord import Interaction
 
-from discord import app_commands, Interaction as Inter
+async def send(interaction:Interaction, *args, **kwargs):
+    await interaction.response.send_message(*args, **kwargs)
 
+async def followup(interaction:Interaction, *args, **kwargs):
+    await interaction.followup.send(*args, **kwargs)
 
-log = logging.getLogger(__name__)
-
-
-def to_choices(string_list:list[str]) -> list[app_commands.Choice[str]]:
-    """Converts a list of strings to a list of Choice objects.
-
-    Returns:
-        list[app_commands.Choice[str]]: The list of choices.
-    """
-    return [
-        app_commands.Choice(name=i, value=i)
-        for i in string_list
-    ]
-
-async def is_bot_owner(inter:Inter):
-    """Checks if the user is the owner of the bot"""
-
-    return await inter.client.is_owner(inter.user)
+async def edit_original(interaction:Interaction, *args, **kwargs):
+    await interaction.edit_original_response(*args, **kwargs)

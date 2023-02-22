@@ -9,8 +9,6 @@ from datetime import timedelta
 import discord
 from discord.ext import commands
 
-from ._logs import setup_logs
-
 
 log = logging.getLogger(__name__)
 
@@ -39,8 +37,6 @@ class Bot(commands.Bot):
             command_prefix="ob ",
             intents=discord.Intents.all()
         )
-
-        self.log_filepath = setup_logs()
         self.commands_synced = False
 
         # Event that can be used to await for all cogs to be loaded
